@@ -19,6 +19,7 @@ import (
 	shipperv1 "github.com/bookingcom/shipper/pkg/apis/shipper/v1"
 	shipperv1informer "github.com/bookingcom/shipper/pkg/client/informers/externalversions/shipper/v1"
 	"github.com/bookingcom/shipper/pkg/clusterclientstore/cache"
+	shippererrors "github.com/bookingcom/shipper/pkg/errors"
 )
 
 // This enables tests to inject an appropriate fake client, which allows us to
@@ -117,7 +118,7 @@ func (s *Store) AddEventHandlerCallback(eventHandler EventHandlerRegisterFunc) {
 func (s *Store) GetClient(clusterName string) (kubernetes.Interface, error) {
 	cluster, ok := s.cache.Fetch(clusterName)
 	if !ok {
-		return nil, cache.ErrClusterNotInStore
+		return nil, shippererrors.NewClusterNotInStore(clusterName)
 	}
 
 	return cluster.GetClient()
@@ -127,7 +128,7 @@ func (s *Store) GetClient(clusterName string) (kubernetes.Interface, error) {
 func (s *Store) GetConfig(clusterName string) (*rest.Config, error) {
 	cluster, ok := s.cache.Fetch(clusterName)
 	if !ok {
-		return nil, cache.ErrClusterNotInStore
+		return nil, shippererrors.NewClusterNotInStore(clusterName)
 	}
 
 	return cluster.GetConfig()
@@ -138,7 +139,7 @@ func (s *Store) GetConfig(clusterName string) (*rest.Config, error) {
 func (s *Store) GetInformerFactory(clusterName string) (kubeinformers.SharedInformerFactory, error) {
 	cluster, ok := s.cache.Fetch(clusterName)
 	if !ok {
-		return nil, cache.ErrClusterNotInStore
+		return nil, shippererrors.NewClusterNotInStore(clusterName)
 	}
 
 	return cluster.GetInformerFactory()
@@ -167,7 +168,7 @@ func (s *Store) syncCluster(name string) error {
 		// needlessly, or could even end up in a livelock where waiting for informer
 		// cache to fill takes longer than the resync period, and resync resets the
 		// informer.
-		if err == nil || err == cache.ErrClusterNotReady {
+		if err == nil || shippererrors.IsClusterNotReady(err) {
 			if config != nil && config.Host == clusterObj.Spec.APIMaster {
 				glog.Infof("Cluster %q syncing, but we already have a client with the right host in the cache", name)
 				return nil
@@ -235,7 +236,7 @@ func (s *Store) syncSecret(key string) error {
 		// needlessly, or could even end up in a livelock where waiting for informer
 		// cache to fill takes longer than the resync period, and resync resets the
 		// informer.
-		if err == nil || err == cache.ErrClusterNotReady {
+		if err == nil || shippererrors.IsClusterNotReady(err) {
 			if existingChecksum == checksum {
 				glog.Infof("Secret %q syncing but we already have a client based on the same checksum in the cache", key)
 				return nil
